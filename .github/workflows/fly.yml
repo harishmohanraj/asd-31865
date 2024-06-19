@@ -1,0 +1,44 @@
+name: Fly Deployment Pipeline
+
+on:
+  workflow_run:
+    workflows: ['Pipeline']
+    types: [completed]
+    branches:
+      - main
+  # or manually
+  workflow_dispatch:
+
+jobs:
+
+  deployment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install wasp
+        run: |
+          curl -sSL https://get.wasp-lang.dev/installer.sh | sh
+          echo "$HOME/.wasp/bin" >> $GITHUB_PATH
+      
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Run the wasp fly deploy command
+        working-directory: app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FASTAGENCY_APPLICATION_UUID: ${{ secrets.FASTAGENCY_APPLICATION_UUID }}
+          REACT_APP_NAME: ${{ vars.REACT_APP_NAME }}
+          REACT_APP_SUPPORT_EMAIL: ${{ vars.REACT_APP_SUPPORT_EMAIL }}
+
+        run: |
+          wasp deploy fly deploy
+          REACT_APP_NAME=$REACT_APP_NAME REACT_APP_SUPPORT_EMAIL=$REACT_APP_SUPPORT_EMAIL wasp deploy fly cmd secrets set \
+          FASTAGENCY_APPLICATION_UUID=$FASTAGENCY_APPLICATION_UUID --context=server
